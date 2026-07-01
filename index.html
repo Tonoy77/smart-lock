@@ -57,6 +57,7 @@
       margin-bottom: 8px;
       background: linear-gradient(to right, #60a5fa, #3b82f6);
       -webkit-background-clip: text;
+      background-clip: text;
       -webkit-text-fill-color: transparent;
     }
 
@@ -207,7 +208,7 @@
     <button class="btn-connect" id="connectBtn">Pair via Bluetooth</button>
 
     <div class="controls" id="controlsSection">
-      <input type="password" id="pinInput" placeholder="Enter PIN (e.g. 1234) maxlength="10">
+      <input type="password" id="pinInput" placeholder="Enter PIN" maxlength="10">
 
       <button class="btn-unlock" id="unlockBtn">UNLOCK DOOR</button>
       <button class="btn-lock" id="lockBtn">LOCK DOOR</button>
@@ -238,35 +239,61 @@
     const pinInput = document.getElementById('pinInput');
     const doorStatusText = document.getElementById('doorStatusText');
 
+    async function connectToDevice(device) {
+      bleDevice = device;
+      bleDevice.addEventListener('gattserverdisconnected', onDisconnected);
+
+      console.log('Connecting to GATT Server...');
+      bleServer = await bleDevice.gatt.connect();
+
+      console.log('Getting Service...');
+      const service = await bleServer.getPrimaryService(SERVICE_UUID);
+
+      console.log('Getting Characteristics...');
+      rxCharacteristic = await service.getCharacteristic(CHAR_RX_UUID);
+      txCharacteristic = await service.getCharacteristic(CHAR_TX_UUID);
+
+      await txCharacteristic.startNotifications();
+      txCharacteristic.addEventListener('characteristicvaluechanged', handleNotifications);
+
+      updateUIConnected();
+    }
+
+    // Check for existing permissions on load
+    window.addEventListener('DOMContentLoaded', async () => {
+      if (navigator.bluetooth && navigator.bluetooth.getDevices) {
+        try {
+          const devices = await navigator.bluetooth.getDevices();
+          if (devices.length > 0) {
+             bleDevice = devices[0];
+             connectBtn.innerText = 'Reconnect to Lock';
+          }
+        } catch (e) {
+          console.error('Error getting devices:', e);
+        }
+      }
+    });
+
     connectBtn.addEventListener('click', async () => {
-      if (bleDevice && bleDevice.gatt.connected) {
+      if (bleDevice && bleDevice.gatt && bleDevice.gatt.connected) {
         bleDevice.gatt.disconnect();
         return;
       }
 
       try {
+        // If we already have a device from getDevices(), try connecting directly
+        if (bleDevice) {
+          await connectToDevice(bleDevice);
+          return;
+        }
+
         console.log('Requesting Bluetooth Device...');
-        bleDevice = await navigator.bluetooth.requestDevice({
+        const device = await navigator.bluetooth.requestDevice({
           filters: [{ name: 'ESP32_DoorLock_BLE' }],
           optionalServices: [SERVICE_UUID]
         });
 
-        bleDevice.addEventListener('gattserverdisconnected', onDisconnected);
-
-        console.log('Connecting to GATT Server...');
-        bleServer = await bleDevice.gatt.connect();
-
-        console.log('Getting Service...');
-        const service = await bleServer.getPrimaryService(SERVICE_UUID);
-
-        console.log('Getting Characteristics...');
-        rxCharacteristic = await service.getCharacteristic(CHAR_RX_UUID);
-        txCharacteristic = await service.getCharacteristic(CHAR_TX_UUID);
-
-        await txCharacteristic.startNotifications();
-        txCharacteristic.addEventListener('characteristicvaluechanged', handleNotifications);
-
-        updateUIConnected();
+        await connectToDevice(device);
 
       } catch (error) {
         console.error('Connection failed!', error);
@@ -327,7 +354,7 @@
     }
 
     function updateUIDisconnected() {
-      connectBtn.innerText = 'Pair via Bluetooth';
+      connectBtn.innerText = bleDevice ? 'Reconnect to Lock' : 'Pair via Bluetooth';
       connectBtn.style.background = 'var(--accent)';
       connectBtn.style.border = 'none';
       connectBtn.style.color = 'white';
