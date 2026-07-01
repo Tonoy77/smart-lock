@@ -1,0 +1,343 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Smart Door Lock</title>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;800&display=swap" rel="stylesheet">
+  <style>
+    :root {
+      --bg-color: #0f172a;
+      --card-bg: rgba(255, 255, 255, 0.05);
+      --card-border: rgba(255, 255, 255, 0.1);
+      --accent: #3b82f6;
+      --accent-hover: #2563eb;
+      --success: #10b981;
+      --danger: #ef4444;
+      --text: #f8fafc;
+      --text-muted: #94a3b8;
+    }
+
+    * {
+      box-sizing: border-box;
+      margin: 0;
+      padding: 0;
+      font-family: 'Inter', sans-serif;
+    }
+
+    body {
+      background-color: var(--bg-color);
+      color: var(--text);
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      min-height: 100vh;
+      background: radial-gradient(circle at top right, #1e293b, #0f172a);
+    }
+
+    .container {
+      background: var(--card-bg);
+      backdrop-filter: blur(16px);
+      -webkit-backdrop-filter: blur(16px);
+      border: 1px solid var(--card-border);
+      border-radius: 24px;
+      padding: 40px;
+      width: 90%;
+      max-width: 400px;
+      text-align: center;
+      box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.5);
+      transition: transform 0.3s ease;
+    }
+
+    h1 {
+      font-weight: 800;
+      font-size: 28px;
+      margin-bottom: 8px;
+      background: linear-gradient(to right, #60a5fa, #3b82f6);
+      -webkit-background-clip: text;
+      -webkit-text-fill-color: transparent;
+    }
+
+    p.subtitle {
+      color: var(--text-muted);
+      margin-bottom: 30px;
+      font-size: 14px;
+    }
+
+    .status-badge {
+      display: inline-flex;
+      align-items: center;
+      gap: 8px;
+      padding: 8px 16px;
+      border-radius: 99px;
+      background: rgba(0, 0, 0, 0.2);
+      font-weight: 600;
+      font-size: 14px;
+      margin-bottom: 30px;
+      border: 1px solid var(--card-border);
+    }
+
+    .status-badge .dot {
+      width: 8px;
+      height: 8px;
+      border-radius: 50%;
+      background: var(--danger);
+      box-shadow: 0 0 10px var(--danger);
+      transition: background 0.3s, box-shadow 0.3s;
+    }
+
+    .status-badge.connected .dot {
+      background: var(--success);
+      box-shadow: 0 0 10px var(--success);
+    }
+
+    input[type="password"] {
+      width: 100%;
+      background: rgba(0, 0, 0, 0.2);
+      border: 1px solid var(--card-border);
+      color: var(--text);
+      padding: 16px;
+      border-radius: 12px;
+      font-size: 16px;
+      margin-bottom: 20px;
+      text-align: center;
+      letter-spacing: 4px;
+      outline: none;
+      transition: border-color 0.3s;
+    }
+
+    input[type="password"]:focus {
+      border-color: var(--accent);
+    }
+
+    button {
+      width: 100%;
+      padding: 16px;
+      border: none;
+      border-radius: 12px;
+      font-size: 16px;
+      font-weight: 600;
+      cursor: pointer;
+      transition: all 0.2s;
+      margin-bottom: 12px;
+    }
+
+    .btn-connect {
+      background: var(--accent);
+      color: white;
+      box-shadow: 0 4px 14px 0 rgba(59, 130, 246, 0.39);
+    }
+
+    .btn-connect:hover {
+      background: var(--accent-hover);
+      transform: translateY(-2px);
+    }
+
+    .btn-lock {
+      background: var(--danger);
+      color: white;
+      box-shadow: 0 4px 14px 0 rgba(239, 68, 68, 0.39);
+    }
+
+    .btn-unlock {
+      background: var(--success);
+      color: white;
+      box-shadow: 0 4px 14px 0 rgba(16, 185, 129, 0.39);
+    }
+
+    .btn-lock:hover,
+    .btn-unlock:hover {
+      transform: translateY(-2px);
+      filter: brightness(1.1);
+    }
+
+    button:disabled {
+      opacity: 0.5;
+      cursor: not-allowed;
+      transform: none !important;
+      box-shadow: none;
+    }
+
+    .controls {
+      display: none;
+      animation: fadeIn 0.5s ease forwards;
+    }
+
+    @keyframes fadeIn {
+      from {
+        opacity: 0;
+        transform: translateY(10px);
+      }
+
+      to {
+        opacity: 1;
+        transform: translateY(0);
+      }
+    }
+
+    .door-status {
+      margin-top: 20px;
+      font-size: 18px;
+      font-weight: 600;
+      letter-spacing: 1px;
+    }
+
+    .note {
+      font-size: 12px;
+      color: var(--text-muted);
+      margin-top: 20px;
+      line-height: 1.5;
+    }
+  </style>
+</head>
+
+<body>
+
+  <div class="container">
+    <h1>Smart Lock</h1>
+    <p class="subtitle">Bluetooth Low Energy (BLE)</p>
+
+    <div class="status-badge" id="connBadge">
+      <div class="dot"></div>
+      <span id="connText">Disconnected</span>
+    </div>
+
+    <button class="btn-connect" id="connectBtn">Pair via Bluetooth</button>
+
+    <div class="controls" id="controlsSection">
+      <input type="password" id="pinInput" placeholder="Enter PIN (e.g. 4489)" maxlength="10">
+
+      <button class="btn-unlock" id="unlockBtn">UNLOCK DOOR</button>
+      <button class="btn-lock" id="lockBtn">LOCK DOOR</button>
+
+      <div class="door-status" id="doorStatusText">Status: Unknown</div>
+    </div>
+
+    <p class="note">Note: Android Chrome requires this page to be hosted on HTTPS (like GitHub pages) or via a Local
+      Server app to enable Web Bluetooth. It will not work from a raw "file://" link.</p>
+  </div>
+
+  <script>
+    const SERVICE_UUID = "4fafc201-1fb5-459e-8fcc-c5c9c331914b";
+    const CHAR_RX_UUID = "beb5483e-36e1-4688-b7f5-ea07361b26a8";
+    const CHAR_TX_UUID = "beb5483f-36e1-4688-b7f5-ea07361b26a8";
+
+    let bleDevice;
+    let bleServer;
+    let rxCharacteristic;
+    let txCharacteristic;
+
+    const connectBtn = document.getElementById('connectBtn');
+    const controlsSection = document.getElementById('controlsSection');
+    const connBadge = document.getElementById('connBadge');
+    const connText = document.getElementById('connText');
+    const unlockBtn = document.getElementById('unlockBtn');
+    const lockBtn = document.getElementById('lockBtn');
+    const pinInput = document.getElementById('pinInput');
+    const doorStatusText = document.getElementById('doorStatusText');
+
+    connectBtn.addEventListener('click', async () => {
+      if (bleDevice && bleDevice.gatt.connected) {
+        bleDevice.gatt.disconnect();
+        return;
+      }
+
+      try {
+        console.log('Requesting Bluetooth Device...');
+        bleDevice = await navigator.bluetooth.requestDevice({
+          filters: [{ name: 'ESP32_DoorLock_BLE' }],
+          optionalServices: [SERVICE_UUID]
+        });
+
+        bleDevice.addEventListener('gattserverdisconnected', onDisconnected);
+
+        console.log('Connecting to GATT Server...');
+        bleServer = await bleDevice.gatt.connect();
+
+        console.log('Getting Service...');
+        const service = await bleServer.getPrimaryService(SERVICE_UUID);
+
+        console.log('Getting Characteristics...');
+        rxCharacteristic = await service.getCharacteristic(CHAR_RX_UUID);
+        txCharacteristic = await service.getCharacteristic(CHAR_TX_UUID);
+
+        await txCharacteristic.startNotifications();
+        txCharacteristic.addEventListener('characteristicvaluechanged', handleNotifications);
+
+        updateUIConnected();
+
+      } catch (error) {
+        console.error('Connection failed!', error);
+        alert('Bluetooth Connection Failed: ' + error + '\nMake sure you are on HTTPS.');
+      }
+    });
+
+    function onDisconnected() {
+      console.log('Device Disconnected');
+      updateUIDisconnected();
+    }
+
+    function handleNotifications(event) {
+      let value = new TextDecoder().decode(event.target.value);
+      console.log('Notification:', value);
+      doorStatusText.innerText = "Status: " + value;
+
+      if (value.includes("ERROR")) {
+        doorStatusText.style.color = "var(--danger)";
+      } else if (value === "UNLOCKED") {
+        doorStatusText.style.color = "var(--success)";
+      } else if (value === "LOCKED") {
+        doorStatusText.style.color = "var(--danger)";
+      } else {
+        doorStatusText.style.color = "var(--text)";
+      }
+    }
+
+    async function sendCommand(cmd) {
+      if (!rxCharacteristic) return;
+      const pin = pinInput.value.trim();
+      if (!pin) {
+        alert("Please enter the PIN");
+        return;
+      }
+
+      const payload = `${pin} ${cmd}`;
+      const encoder = new TextEncoder();
+      try {
+        await rxCharacteristic.writeValue(encoder.encode(payload));
+        console.log('Sent:', payload);
+      } catch (error) {
+        console.error('Write failed:', error);
+      }
+    }
+
+    unlockBtn.addEventListener('click', () => sendCommand('unlock'));
+    lockBtn.addEventListener('click', () => sendCommand('lock'));
+
+    function updateUIConnected() {
+      connectBtn.innerText = 'Disconnect';
+      connectBtn.style.background = 'transparent';
+      connectBtn.style.border = '1px solid var(--danger)';
+      connectBtn.style.color = 'var(--danger)';
+      connBadge.classList.add('connected');
+      connText.innerText = 'Connected';
+      controlsSection.style.display = 'block';
+    }
+
+    function updateUIDisconnected() {
+      connectBtn.innerText = 'Pair via Bluetooth';
+      connectBtn.style.background = 'var(--accent)';
+      connectBtn.style.border = 'none';
+      connectBtn.style.color = 'white';
+      connBadge.classList.remove('connected');
+      connText.innerText = 'Disconnected';
+      controlsSection.style.display = 'none';
+      doorStatusText.innerText = 'Status: Unknown';
+      doorStatusText.style.color = 'var(--text)';
+    }
+  </script>
+</body>
+
+</html>
