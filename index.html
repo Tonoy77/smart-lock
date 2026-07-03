@@ -1,10 +1,15 @@
 <!DOCTYPE html>
 <html lang="en">
-
 <head>
   <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
   <title>Smart Door Lock</title>
+  
+  <!-- PWA Manifest -->
+  <link rel="manifest" href="manifest.json">
+  <meta name="theme-color" content="#0f172a">
+  <link rel="apple-touch-icon" href="icon.svg">
+  
   <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;800&display=swap" rel="stylesheet">
   <style>
     :root {
@@ -18,7 +23,7 @@
       --text: #f8fafc;
       --text-muted: #94a3b8;
     }
-
+    
     * {
       box-sizing: border-box;
       margin: 0;
@@ -35,6 +40,7 @@
       justify-content: center;
       min-height: 100vh;
       background: radial-gradient(circle at top right, #1e293b, #0f172a);
+      user-select: none; /* Prevent text selection in app */
     }
 
     .container {
@@ -57,7 +63,6 @@
       margin-bottom: 8px;
       background: linear-gradient(to right, #60a5fa, #3b82f6);
       -webkit-background-clip: text;
-      background-clip: text;
       -webkit-text-fill-color: transparent;
     }
 
@@ -79,7 +84,7 @@
       margin-bottom: 30px;
       border: 1px solid var(--card-border);
     }
-
+    
     .status-badge .dot {
       width: 8px;
       height: 8px;
@@ -92,25 +97,6 @@
     .status-badge.connected .dot {
       background: var(--success);
       box-shadow: 0 0 10px var(--success);
-    }
-
-    input[type="password"] {
-      width: 100%;
-      background: rgba(0, 0, 0, 0.2);
-      border: 1px solid var(--card-border);
-      color: var(--text);
-      padding: 16px;
-      border-radius: 12px;
-      font-size: 16px;
-      margin-bottom: 20px;
-      text-align: center;
-      letter-spacing: 4px;
-      outline: none;
-      transition: border-color 0.3s;
-    }
-
-    input[type="password"]:focus {
-      border-color: var(--accent);
     }
 
     button {
@@ -141,24 +127,16 @@
       color: white;
       box-shadow: 0 4px 14px 0 rgba(239, 68, 68, 0.39);
     }
-
+    
     .btn-unlock {
       background: var(--success);
       color: white;
       box-shadow: 0 4px 14px 0 rgba(16, 185, 129, 0.39);
     }
 
-    .btn-lock:hover,
-    .btn-unlock:hover {
+    .btn-lock:hover, .btn-unlock:hover {
       transform: translateY(-2px);
       filter: brightness(1.1);
-    }
-
-    button:disabled {
-      opacity: 0.5;
-      cursor: not-allowed;
-      transform: none !important;
-      box-shadow: none;
     }
 
     .controls {
@@ -167,38 +145,23 @@
     }
 
     @keyframes fadeIn {
-      from {
-        opacity: 0;
-        transform: translateY(10px);
-      }
-
-      to {
-        opacity: 1;
-        transform: translateY(0);
-      }
+      from { opacity: 0; transform: translateY(10px); }
+      to { opacity: 1; transform: translateY(0); }
     }
-
+    
     .door-status {
       margin-top: 20px;
       font-size: 18px;
       font-weight: 600;
       letter-spacing: 1px;
     }
-
-    .note {
-      font-size: 12px;
-      color: var(--text-muted);
-      margin-top: 20px;
-      line-height: 1.5;
-    }
   </style>
 </head>
-
 <body>
 
   <div class="container">
-    <h1>Smart Lock</h1>
-    <p class="subtitle">Bluetooth Low Energy (BLE)</p>
+    <h1>Smart Key</h1>
+    <p class="subtitle">Secure Offline Access</p>
 
     <div class="status-badge" id="connBadge">
       <div class="dot"></div>
@@ -208,22 +171,29 @@
     <button class="btn-connect" id="connectBtn">Pair via Bluetooth</button>
 
     <div class="controls" id="controlsSection">
-      <input type="password" id="pinInput" placeholder="Enter PIN" maxlength="10">
-
+      <!-- PIN input removed. The app acts as the key using the hardcoded PIN -->
       <button class="btn-unlock" id="unlockBtn">UNLOCK DOOR</button>
       <button class="btn-lock" id="lockBtn">LOCK DOOR</button>
-
+      
       <div class="door-status" id="doorStatusText">Status: Unknown</div>
     </div>
-
-    <p class="note">Note: Android Chrome requires this page to be hosted on HTTPS (like GitHub pages) or via a Local
-      Server app to enable Web Bluetooth. It will not work from a raw "file://" link.</p>
   </div>
 
   <script>
+    // PWA Service Worker Registration
+    if ('serviceWorker' in navigator) {
+      navigator.serviceWorker.register('sw.js')
+        .then(reg => console.log('Service Worker registered', reg))
+        .catch(err => console.error('Service Worker registration failed', err));
+    }
+
+    // BLE configuration
     const SERVICE_UUID = "4fafc201-1fb5-459e-8fcc-c5c9c331914b";
     const CHAR_RX_UUID = "beb5483e-36e1-4688-b7f5-ea07361b26a8";
     const CHAR_TX_UUID = "beb5483f-36e1-4688-b7f5-ea07361b26a8";
+    
+    // HARDCODED SECURE PIN (App acts as key)
+    const SECRET_PIN = "4489";
 
     let bleDevice;
     let bleServer;
@@ -236,7 +206,6 @@
     const connText = document.getElementById('connText');
     const unlockBtn = document.getElementById('unlockBtn');
     const lockBtn = document.getElementById('lockBtn');
-    const pinInput = document.getElementById('pinInput');
     const doorStatusText = document.getElementById('doorStatusText');
 
     async function connectToDevice(device) {
@@ -259,7 +228,6 @@
       updateUIConnected();
     }
 
-    // Check for existing permissions on load
     window.addEventListener('DOMContentLoaded', async () => {
       if (navigator.bluetooth && navigator.bluetooth.getDevices) {
         try {
@@ -281,13 +249,11 @@
       }
 
       try {
-        // If we already have a device from getDevices(), try connecting directly
         if (bleDevice) {
           await connectToDevice(bleDevice);
           return;
         }
 
-        console.log('Requesting Bluetooth Device...');
         const device = await navigator.bluetooth.requestDevice({
           filters: [{ name: 'ESP32_DoorLock_BLE' }],
           optionalServices: [SERVICE_UUID]
@@ -297,7 +263,7 @@
 
       } catch (error) {
         console.error('Connection failed!', error);
-        alert('Bluetooth Connection Failed: ' + error + '\nMake sure you are on HTTPS.');
+        alert('Bluetooth Connection Failed. Make sure you are in range and bluetooth is on.');
       }
     });
 
@@ -310,8 +276,8 @@
       let value = new TextDecoder().decode(event.target.value);
       console.log('Notification:', value);
       doorStatusText.innerText = "Status: " + value;
-
-      if (value.includes("ERROR")) {
+      
+      if(value.includes("ERROR")) {
         doorStatusText.style.color = "var(--danger)";
       } else if (value === "UNLOCKED") {
         doorStatusText.style.color = "var(--success)";
@@ -324,17 +290,13 @@
 
     async function sendCommand(cmd) {
       if (!rxCharacteristic) return;
-      const pin = pinInput.value.trim();
-      if (!pin) {
-        alert("Please enter the PIN");
-        return;
-      }
-
-      const payload = `${pin} ${cmd}`;
+      
+      // Inject hardcoded PIN automatically
+      const payload = `${SECRET_PIN} ${cmd}`;
       const encoder = new TextEncoder();
       try {
         await rxCharacteristic.writeValue(encoder.encode(payload));
-        console.log('Sent:', payload);
+        console.log('Sent secure command');
       } catch (error) {
         console.error('Write failed:', error);
       }
@@ -366,5 +328,4 @@
     }
   </script>
 </body>
-
 </html>
